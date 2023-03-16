@@ -4,33 +4,24 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155BurnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract DragonTest is Initializable, ERC1155Upgradeable, OwnableUpgradeable, PausableUpgradeable, ERC1155BurnableUpgradeable, UUPSUpgradeable {
+contract DragonTest is Initializable, ERC1155Upgradeable, OwnableUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
     string public baseExtension;
-    uint256 public maxSupply;
     uint256 public maxMintAmount;
+    using Strings for uint256;
 
-    function initialize() initializer public {
-        __ERC1155_init("");
-        __Ownable_init();
-        __Pausable_init();
-        __ERC1155Burnable_init();
-        __UUPSUpgradeable_init();
-        
-        maxMintAmount = 5;
-        maxSupply = 2000;
-        baseExtension = ".json";
-    }
+    mapping (uint256 => uint256) public tokenSupply;
+    mapping (address => bool) public blacklisted;
+    mapping (uint256 => uint256) public maxSupply;
 
     struct TokenInfo {
         IERC20 paytoken;
@@ -39,9 +30,16 @@ contract DragonTest is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Pa
 
     TokenInfo[] public AllowedCrypto;
 
-    using Strings for uint256;
-    mapping (uint256 => uint256) public tokenSupply;
-    mapping(address => bool) public blacklisted;
+    function initialize() initializer public {
+        __ERC1155_init("");
+        __Ownable_init();
+        __Pausable_init();
+        __UUPSUpgradeable_init();
+        
+        maxSupply[1] = 2000;
+        maxMintAmount = 5;
+        baseExtension = ".json";
+    }
 
     function addCurrency(
         IERC20 _paytoken,
@@ -59,20 +57,21 @@ contract DragonTest is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Pa
         return "https://gateway.pinata.cloud/ipfs/QmPF1t8fdT2kDAAYpitP7wSurFyNewAzxmCdZWoogE9q6V/";
     }
 
-    function mint(uint256 _mintAmount, uint256 _pid) public payable {
+    function mint(uint256 _mintAmount, uint256 _pid) public payable whenNotPaused {
         require(_mintAmount > 0, "Mint amount minimum 5");
 
+        uint256 mintTokenId = 1;
         TokenInfo storage tokens = AllowedCrypto[_pid];
         IERC20 paytoken;
         paytoken = tokens.paytoken;
         uint256 cost;
         cost = tokens.costvalue;
         uint256 supply;
-        supply = tokenSupply[1];
+        supply = tokenSupply[mintTokenId];
 
 
         require(_mintAmount <= maxMintAmount, "Bigger then maxMintAmount");
-        require(supply + _mintAmount <= maxSupply, "Max supply reached!");
+        require(supply + _mintAmount <= maxSupply[mintTokenId], "Max supply reached!");
         require(blacklisted[msg.sender] != true, "Already minted a dragon.");
 
         if (msg.sender != owner()) {
@@ -82,7 +81,7 @@ contract DragonTest is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Pa
         for (uint256 i = 1; i <= _mintAmount; i++) {
             paytoken.transferFrom(msg.sender, address(this), cost);
             _mint(msg.sender, 1, 1, "0x000");
-            tokenSupply[1]++;
+            tokenSupply[mintTokenId]++;
         }
         blacklisted[msg.sender] = true;
 
@@ -109,13 +108,27 @@ contract DragonTest is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Pa
             abi.encodePacked(
                 currentBaseURI,
                 Strings.toString(_tokenId),
-                ".json"
+                baseExtension
             )
         );
     }
 
+    //// Only owner functions.
+
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+
     function setmaxMintAmount(uint256 _newmaxMintAmount) public onlyOwner {
         maxMintAmount = _newmaxMintAmount;
+    }
+
+    function setmaxSupply(uint256 _tokenId, uint256 _maxSupply) public onlyOwner {
+        maxSupply[_tokenId] = _maxSupply;
     }
 
     function withdraw(uint256 _pid) public payable onlyOwner {
@@ -124,5 +137,7 @@ contract DragonTest is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Pa
         paytoken = tokens.paytoken;
         paytoken.transfer(msg.sender, paytoken.balanceOf(address(this)));
     }
+
+
 
 }
