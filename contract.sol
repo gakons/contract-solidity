@@ -23,7 +23,7 @@ contract SFD is ERC1155, Ownable {
         bool mintAvaible;
         PayTokenInfo[] mintPrice;
     }
-
+    //mapping (uint256 => PayTokenInfo[]) public prices;
     mapping (uint256 => TokenInfo) public TokenList;
     using Strings for uint256;
     string public baseURI = "https://gateway.pinata.cloud/ipfs/QmPF1t8fdT2kDAAYpitP7wSurFyNewAzxmCdZWoogE9q6V/";
@@ -77,11 +77,13 @@ contract SFD is ERC1155, Ownable {
 
     // owner functions
     
-    function setMintPrice(uint256 _id, IERC20[] memory _paytokens, uint256[] memory _costvalues) public onlyOwner {
-        
+    function addMintPrice(uint256 _id, IERC20[] memory _paytokens, uint256[] memory _costvalues) public onlyOwner {
         for (uint256 i = 0; i < _paytokens.length; i++) {
-            TokenList[_id].mintPrice[i].paytoken = _paytokens[i];
-            TokenList[_id].mintPrice[i].costvalue = _costvalues[i];
+            TokenList[_id].mintPrice.push(
+            PayTokenInfo({
+                paytoken: _paytokens[i],
+                costvalue: _costvalues[i]
+            }));
         }
     }
 
